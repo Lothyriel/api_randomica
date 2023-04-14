@@ -22,7 +22,7 @@ export function salarioLiquido(salarioBruto: number, numeroDependentes: number =
 
     const calculoInssIrrf = calculateINSSandIRRF(salarioBruto, numeroDependentes)
 
-    const totalDesconto = ((100 * calculoInssIrrf.irrfPorcent).toFixed(2), desconto + calculoInss.inssVal + calculoInssIrrf.irrfVal)
+    const totalDesconto = desconto + calculoInss.inssVal + calculoInssIrrf.irrfVal
 
     return {
         salarioLiquido: salarioBruto - totalDesconto,
