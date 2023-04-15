@@ -1,19 +1,37 @@
-FROM node:lts-alpine AS packages
+FROM debian:bullseye as builder
 
-ADD package-lock.json /app/package-lock.json
-ADD package.json /app/package.json
+ARG NODE_VERSION=19.7.0
 
+RUN apt-get update; apt install -y curl python-is-python3 pkg-config build-essential
+RUN curl https://get.volta.sh | bash
+ENV VOLTA_HOME /root/.volta
+ENV PATH /root/.volta/bin:$PATH
+RUN volta install node@${NODE_VERSION}
+
+#######################################################################
+
+RUN mkdir /app
 WORKDIR /app
 
-# Installing packages
-RUN npm ci
+# NPM will not install any package listed in "devDependencies" when NODE_ENV is set to "production",
+# to install all modules: "npm install --production=false".
+# Ref: https://docs.npmjs.com/cli/v9/commands/npm-install#description
 
-# Staging Image
-FROM packages
+ENV NODE_ENV production
 
-ADD . /app
+COPY . .
 
-# Building TypeScript files
-RUN npm run build
+RUN npm install
+FROM debian:bullseye
 
-CMD ['node', './dist']
+LABEL fly_launch_runtime="nodejs"
+
+COPY --from=builder /root/.volta /root/.volta
+COPY --from=builder /app /app
+
+WORKDIR /app
+ENV NODE_ENV production
+ENV PATH /root/.volta/bin:$PATH
+
+EXPOSE 8080
+CMD [ "node", "dist/index.js" ]
