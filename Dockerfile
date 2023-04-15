@@ -1,37 +1,25 @@
-FROM debian:bullseye as builder
-
-ARG NODE_VERSION=19.7.0
-
-RUN apt-get update; apt install -y curl python-is-python3 pkg-config build-essential
-RUN curl https://get.volta.sh | bash
-ENV VOLTA_HOME /root/.volta
-ENV PATH /root/.volta/bin:$PATH
-RUN volta install node@${NODE_VERSION}
-
-#######################################################################
-
-RUN mkdir /app
-WORKDIR /app
-
-# NPM will not install any package listed in "devDependencies" when NODE_ENV is set to "production",
-# to install all modules: "npm install --production=false".
-# Ref: https://docs.npmjs.com/cli/v9/commands/npm-install#description
-
-ENV NODE_ENV production
-
-COPY . .
-
+# STAGE 1
+FROM node:12-alpine as builder
+RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
+WORKDIR /home/node/app
+COPY package*.json ./
+RUN npm config set unsafe-perm true
+RUN npm install -g typescript
+RUN npm install -g ts-node
+USER node
 RUN npm install
-FROM debian:bullseye
+COPY --chown=node:node . .
+RUN npm run build
 
-LABEL fly_launch_runtime="nodejs"
-
-COPY --from=builder /root/.volta /root/.volta
-COPY --from=builder /app /app
-
-WORKDIR /app
-ENV NODE_ENV production
-ENV PATH /root/.volta/bin:$PATH
+# STAGE 2
+FROM node:12-alpine
+RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
+WORKDIR /home/node/app
+COPY package*.json ./
+USER node
+# RUN npm install --save-dev sequelize-cli
+RUN npm install --production
+COPY --from=builder /home/node/app/dist ./dist
 
 EXPOSE 8080
 CMD [ "node", "dist/index.js" ]
